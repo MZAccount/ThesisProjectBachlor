@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Evitarea Obstacolelor</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <style>
+            body {
+                color: #808080;
+                font-family:Monospace;
+                font-size:13px;
+                text-align:center;
+
+                background-color: #ffffff;
+                margin: 0px;
+                overflow: hidden;
+            }
+
+            #info {
+                position: absolute;
+                top: 0px; width: 100%;
+                padding: 5px;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div id="container"></div>
+		
+        <script src="../build/three.js"></script>
+
+        <script src="js/renderers/Projector.js"></script>
+        <script src="js/renderers/CanvasRenderer.js"></script>
+
+       
+        <script src="obj/Bird.js"></script>
+
+		
+        <script>//inceputul proiectului
+
+			function Gauss_5_25(){	//functia ce returneaza valori [0,1] cu o 
+									//distributie N(0.5,0.25^2), aproximativ
+									//
+				return (Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()-3)/6
+			}
+			
+			
+            var Boid = function() {	//clasa asociata particulelor, facandu-se 
+									//distinctie intre particule si modelul 
+									//pasarilor
+
+				//parametri privati ai fiecarei instante					
+                var vector = new THREE.Vector3(),
+                _acceleration, _width = 300, _height = 300, _depth = 200, _goal, _neighborhoodRadius = 100,
+                _center_x = 0, _center_y = 0, _center_z = 0,
+				_maxSpeed = 4, _maxSteerForce = 0.1, _avoidWalls = false,
+				_distCoef = 0.6;
+				_randValueGen = Math.random;
+
+                this.position = new THREE.Vector3();
+                this.velocity = new THREE.Vector3();
+                _acceleration = new THREE.Vector3();
+				
+				//seteaza coef. de distributie, utilizat in separare, aliniere 
+				//si coeziune.
+				//
+				this.setDistCoef = function ( val ) {	
+					if(val<1&&val>0)
+                    _distCoef = val;
+
+                };
+				//seteaza tipul tistributiei pentru coeficient alterneaza intre 
+				//uniforma si normala
+				this.setDistType = function ( type ) {
+					if(type==0)
+					_randValueGen = Math.random;
+					else
+					_randValueGen = Gauss_5_25;
+                };
+				//seteaza tinta
+                this.setGoal = function ( target ) {
+
+                    _goal = target;
+
+                };
+
+                this.setAvoidWalls = function ( value ) {
+
+                    _avoidWalls = value;
+
+                };
+
+				
+				this.getWorldSizeX = function () {return _width;}
+				this.getWorldSizeY = function () {return _height;}
+				this.getWorldSizeZ = function () {return _depth;}
+				 
+
+				
+				this.setWorldSize = function ( width, height, depth , x, y, z ) {
+
+                    _width = width;
+                    _height = height;
+                    _depth = depth;
+					if(arguments.length==6){
+						_center_x = x;
+						_center_y = y;
+						_center_z = z;
+					}
+					
+					
+					
+					vector.set( - _width + _center_x, this.position.y, this.position.z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+						
+						
+						if( (- _width + _center_x) > this.position.x ){
+							this.position.x = (- _width + _center_x) + 10;//TODO schimba 10 cu o valoare a ta.
+						}
+					
+                        if( (_width + _center_x) < this.position.x ){
+							this.position.x = (  _width + _center_x) - 10;
+						}
+
+                        if( ( - _height + _center_y) > this.position.y ){
+							this.position.y = (-_height + _center_y) + 10;
+						}
+
+                        if( (_height + _center_y) < this.position.y ){
+							this.position.y = ( _height + _center_y) - 10;
+						}
+
+                        if( (- _depth + _center_z) > this.position.z){
+							this.position.z = (- _depth + _center_z) + 10;
+						}
+
+                        if( (_depth + _center_z) < this.position.z){
+							this.position.z = (  _depth + _center_z) - 10;
+						}
+
+                };
+
+				//functie rulata in fiecare etapa de render,se asigura ca 
+				//particula este in limitele de pozitie impuse si parcurge toti 
+				//pasii necesari pentru a naviga particula actuala prin spatiu
+                this.run = function ( boids ) {
+
+                    if ( _avoidWalls ) {
+
+                        vector.set( - _width + _center_x, this.position.y, this.position.z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                        vector.set( _width + _center_x, this.position.y, this.position.z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                        vector.set( this.position.x, - _height + _center_y, this.position.z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                        vector.set( this.position.x, _height + _center_y, this.position.z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                        vector.set( this.position.x, this.position.y, - _depth + _center_z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                        vector.set( this.position.x, this.position.y, _depth + _center_z );
+                        vector = this.avoid( vector );
+                        vector.multiplyScalar( 5 );
+                        _acceleration.add( vector );
+
+                    }
+                        this.flock( boids );
+                    this.move();
+
+                };
+			
+				//parcurge toti pasii necesari pentru a naviga particula 
+				//actuala prin spatiu
+                this.flock = function ( boids ) {
+
+                    if ( _goal ) {
+
+                        _acceleration.add( this.reach( _goal, 0.005 ) );
+
+                    }
+
+                    _acceleration.add( this.alignment( boids ) );
+                    _acceleration.add( this.cohesion( boids ) );
+                    _acceleration.add( this.separation( boids ) );
+
+                };
+
+				//actualizarea pozitiei particulei
+                this.move = function () {
+
+                    this.velocity.add( _acceleration );
+
+                    var l = this.velocity.length();
+
+                    if ( l > _maxSpeed ) {
+
+                        this.velocity.divideScalar( l / _maxSpeed );
+
+                    }
+
+                    this.position.add( this.velocity );
+                    _acceleration.set( 0, 0, 0 );
+
+                };
+
+                this.checkBounds = function () {
+
+                    if ( this.position.x >   _width ) this.position.x = - _width;
+                    if ( this.position.x < - _width ) this.position.x =   _width;
+                    if ( this.position.y >   _height ) this.position.y = - _height;
+                    if ( this.position.y < - _height ) this.position.y =  _height;
+                    if ( this.position.z >  _depth ) this.position.z = - _depth;
+                    if ( this.position.z < - _depth ) this.position.z =  _depth;
+
+                };
+
+                //
+				//generarea unei forte de respingere fata de un anumit punct,
+				//forta scade in functie de creasterea patratului distantei
+                this.avoid = function ( target ) {
+
+                    var steer = new THREE.Vector3();
+
+                    steer.copy( this.position );
+                    steer.sub( target );
+
+                    steer.multiplyScalar( 1 / this.position.distanceToSquared( target ) );
+
+                    return steer;
+
+                };
+
+				//generarea unei forte de respingere fata de un anumit punct,
+				//forta scade liniar in functie de cresterea distantei
+                this.repulse = function ( target ) {
+
+                    var distance = this.position.distanceTo( target );
+
+                    if ( distance < 150 ) {
+
+                        var steer = new THREE.Vector3();
+
+                        steer.subVectors( this.position, target );
+                        steer.multiplyScalar( 0.5 / distance );
+
+                        _acceleration.add( steer );
+
+                    }
+
+                };
+
+				//genereaza un vector orientat spre tinta, al doilea argument 
+				//este un multiplicator al fortei.
+                this.reach = function ( target, amount ) {
+
+                    var steer = new THREE.Vector3();
+
+                    steer.subVectors( target, this.position );
+                    steer.multiplyScalar( amount );
+
+                    return steer;
+
+                };
+
+				//genereaza o forta de atractie in functie de proximitatea 
+				//tintei
+                this.attract = function ( target ) {
+
+                    var distance = this.position.distanceTo( target );
+
+                    if ( distance < 150 ) {
+
+                        var steer = new THREE.Vector3();
+
+                        steer.subVectors(  target ,this.position );
+
+                        _acceleration.add( steer.normalize().multiplyScalar(0.5) );//valoare mai mica decat cea de atractie pentru tinta
+
+                    }
+
+                };
+				
+				//aliniaza vectorul de viteza dupa vecini
+                this.alignment = function ( boids ) {
+
+                    var boid, velSum = new THREE.Vector3(),
+                    count = 0;
+
+                    for ( var i = 0, il = boids.length; i < il; i++ ) {
+
+                        if ( _randValueGen() > _distCoef ) continue;
+
+                        boid = boids[ i ];
+
+                        distance = boid.position.distanceTo( this.position );
+
+                        if ( distance > 0 && distance <= _neighborhoodRadius ) {
+
+                            velSum.add( boid.velocity );
+                            count++;
+
+                        }
+
+                    }
+
+                    if ( count > 0 ) {
+
+                        velSum.divideScalar( count );
+
+                        var l = velSum.length();
+
+                        if ( l > _maxSteerForce ) {
+
+                            velSum.divideScalar( l / _maxSteerForce );
+
+                        }
+
+                    }
+
+                    return velSum;
+
+                };
+
+				//muta particula mai aproape de pozitia valorii medii grupului
+				//local
+                this.cohesion = function ( boids ) {
+
+                    var boid, distance,
+                    posSum = new THREE.Vector3(),
+                    steer = new THREE.Vector3(),
+                    count = 0;
+
+                    for ( var i = 0, il = boids.length; i < il; i ++ ) {
+
+                        if ( _randValueGen() > _distCoef ) continue;
+
+                        boid = boids[ i ];
+                        distance = boid.position.distanceTo( this.position );
+
+                        if ( distance > 0 && distance <= _neighborhoodRadius ) {
+
+                            posSum.add( boid.position );
+                            count++;
+
+                        }
+
+                    }
+
+                    if ( count > 0 ) {
+
+                        posSum.divideScalar( count );
+
+                    }
+
+                    steer.subVectors( posSum, this.position );
+
+                    var l = steer.length();
+
+                    if ( l > _maxSteerForce ) {
+
+                        steer.divideScalar( l / _maxSteerForce );
+
+                    }
+
+                    return steer;
+
+                };
+
+				//indeparteaza particula de vecini
+                this.separation = function ( boids ) {
+
+                    var boid, distance,
+                    posSum = new THREE.Vector3(),
+                    repulse = new THREE.Vector3();
+
+                    for ( var i = 0, il = boids.length; i < il; i ++ ) {
+
+                        if ( _randValueGen() > _distCoef ) continue;
+
+                        boid = boids[ i ];
+                        distance = boid.position.distanceTo( this.position );
+
+                        if ( distance > 0 && distance <= _neighborhoodRadius ) {
+
+                            repulse.subVectors( this.position, boid.position );
+                            repulse.normalize();
+                            repulse.divideScalar( distance );
+                            posSum.add( repulse );
+
+                        }
+
+                    }
+
+                    return posSum;
+
+                }
+
+            }
+
+        </script>
+
+        <script>
+
+            var SCREEN_WIDTH = window.innerWidth,
+            SCREEN_HEIGHT = window.innerHeight,
+            SCREEN_WIDTH_HALF = SCREEN_WIDTH  / 2,
+            SCREEN_HEIGHT_HALF = SCREEN_HEIGHT / 2;
+
+            var camera, scene, renderer,
+            birds, bird;
+
+            var boid, boids;
+			
+			
+            init();
+            animate();
+
+			var scene_handle_for_gui;
+			
+            function init() {
+				//seteaza pozitia camerei
+                camera = new THREE.PerspectiveCamera( 75, SCREEN_WIDTH / SCREEN_HEIGHT, 0.1, 10000 );
+                camera.position.y = 300;
+				camera.position.z = 800;
+				camera.rotation.x=-0.60
+
+                
+                
+                //obiectul scena, folosit pentru a retine toate obiectele care
+				//vor fi desenate
+                scene_handle_for_gui = scene = new THREE.Scene();
+
+                
+                
+                scene.add( new THREE.AmbientLight( 0xffffff, 0.4 ) );
+
+                var light = new THREE.DirectionalLight( 0xffffff, 1 );
+                light.position.set( 1, 1, 1 );
+                scene.add( light );
+				
+                
+                //initializarea particulelor si a pasarilor
+                birds = [];
+                boids = [];
+				var no_of_birds = 100
+                for ( var i = 0; i < no_of_birds; i ++ ) {
+
+                    boid = boids[ i ] = new Boid();
+                    boid.position.x = Math.random() * 200 - 100;
+                    boid.position.y = Math.random() * 40 - 20;
+                    boid.position.z = Math.random() * 200 - 100;
+                    boid.velocity.x = Math.random() * 2 - 1;
+                    boid.velocity.y = Math.random() * 2 - 1;
+                    boid.velocity.z = Math.random() * 2 - 1;
+                    boid.setAvoidWalls( true );
+                    boid.setWorldSize( 400, 150, 400 ,0,100,0);
+
+                    
+                    //
+                        
+                        
+                        var loader = new THREE.TextureLoader();
+                                    
+                
+                        var myCustomMaterial = new THREE.MeshBasicMaterial( { color:Math.random() * 0xffffff, side: THREE.DoubleSide } );
+                        
+                        
+                        
+                        bird = birds[ i ] = new THREE.Mesh( new Bird(), myCustomMaterial );
+                    
+                    //valoare utilizata pentru a batea din aripi
+                    bird.phase = Math.floor( Math.random() * 62.83 );
+                    scene.add( bird );
+
+
+                }
+				
+				
+                renderer = new THREE.WebGLRenderer();
+                renderer.setClearColor( 0xffffff );
+                renderer.setPixelRatio( window.devicePixelRatio );
+                renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+
+                document.body.appendChild( renderer.domElement );
+
+                //
+				//repara imaginea in cazul in care e redimensionata fereastra 
+				//browserului
+                window.addEventListener( 'resize', onWindowResize, false );
+            }
+			
+			
+
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+            }
+
+			var clock=0;
+			
+			
+			var global_simulation_pause=false;
+			
+			//functia apelata periodic de renderer, pentru a reda fiecare 
+			//imagine
+            function animate() {
+
+                requestAnimationFrame( animate );
+
+				if(!global_simulation_pause)
+					render();
+				else
+					renderer.render( scene, camera );
+
+            }
+			
+			//valori globale utilizate de catre meniu
+            var single_gloabal_ballon_exists=false,single_gloabal_ballon_position,single_gloabal_ballon_clock=0,single_gloabal_ballon_speed_div=1000,sgb_vz=0;
+			var global_object_goal=new THREE.Object3D(),global_object_goal_exists=false,global_object_goal_existed=false;
+			var global_setParam_distCoef=false,global_setParam_distCoef_value=0.6;
+			var global_simulation_pause=false;
+			var global_simulation_colorise=false;
+			
+			//functia de desenare
+			function render() {
+				//perioada pentru a aprinde si stinge luminile tintei
+				clock=(clock+1)%600;
+				//actualizarea pasarilor
+                for ( var i = 0, il = birds.length; i < il; i++ ) {
+					//actualizarea pozitiei si vitezei particulei
+                    boid = boids[ i ];
+					
+					{
+						//interactiunea cu celelate particule
+						boid.run( boids );//TODO: paralelize
+						
+						//interactiunea cu punctele de respingere
+						for ( var j = 0, jl = MyCounter_Points; j < jl; j++ ){
+						
+							var vector = new THREE.Vector3();
+							
+							vector.copy( MyVectorArray_FearPoints[j]);
+							
+							boid.repulse( vector );
+						}
+						
+						
+						
+						//interactiunea cu punctele de atractie
+						for ( var j = 0, jl = MyCounter_AttractionPoints; j < jl; j++ ){
+						
+							var vector = new THREE.Vector3();
+							
+							vector.copy( MyVectorArray_AttractionPoints[j]);
+							
+							boid.attract( vector );
+						}
+					}
+					
+					
+					//actualizarea pozitiei modelului
+                    bird = birds[ i ];
+                    bird.position.copy( boids[ i ].position );
+					//actualizarea culorii modelului
+                    color = bird.material.color;
+					if(global_simulation_colorise==true){
+						color.r = ( boid.getWorldSizeX() - bird.position.x ) / boid.getWorldSizeX()*2;
+						color.g = ( boid.getWorldSizeY() - bird.position.y ) / boid.getWorldSizeX()*2;
+						color.b = ( boid.getWorldSizeZ() - bird.position.z ) / boid.getWorldSizeX()*2;
+					}
+					else
+						color.r = color.g = color.b = ( 600 - bird.position.z ) / 1200;
+					//rotirea modelului
+                    bird.rotation.y = Math.atan2( - boid.velocity.z, boid.velocity.x );		
+                    bird.rotation.z = Math.asin( boid.velocity.y / boid.velocity.length() );
+					//miscarea aripilor
+                    bird.phase = ( bird.phase + ( Math.max( 0, bird.rotation.z ) + 0.1 )  ) % 62.83;
+                    bird.geometry.vertices[ 5 ].y = bird.geometry.vertices[ 4 ].y = Math.sin( bird.phase ) * 5;
+					
+					
+
+                }
+				
+				//actualizarea balonului cu aer cald
+                if(single_gloabal_ballon_exists == true)
+				{
+					single_gloabal_ballon_clock=(1+single_gloabal_ballon_clock)%single_gloabal_ballon_speed_div;			
+					single_gloabal_ballon_position.x=single_gloabal_ballon_position.x+Math.sin(single_gloabal_ballon_clock/single_gloabal_ballon_speed_div*2*Math.PI)*5*500/single_gloabal_ballon_speed_div;//TODO:rephrase formula speed
+					single_gloabal_ballon_position.y=single_gloabal_ballon_position.y+Math.sin(single_gloabal_ballon_clock/single_gloabal_ballon_speed_div*2*Math.PI)*2*500/single_gloabal_ballon_speed_div;			
+					single_gloabal_ballon_position.z=single_gloabal_ballon_position.z-Math.cos(single_gloabal_ballon_clock/single_gloabal_ballon_speed_div*2*Math.PI)*2*200/single_gloabal_ballon_speed_div+sgb_vz;	
+					 
+				}
+				
+				
+				//actualizarea tintei, daca exista
+				if(global_object_goal_exists==true)
+				{
+					global_object_goal.time=(global_object_goal.time+global_object_goal.time_iteration)%1;
+					global_object_goal.position.x=global_object_goal.curve.getPointAt(global_object_goal.time).x;
+					global_object_goal.position.y=global_object_goal.curve.getPointAt(global_object_goal.time).y;
+					global_object_goal.position.z=global_object_goal.curve.getPointAt(global_object_goal.time).z;
+				
+					//notifica fiecare particula ca exista o tinta, sau ca a 
+					//disparut
+					if(global_object_goal_existed!=global_object_goal_exists){
+						for ( var i = 0, il = birds.length; i < il; i++ ) {
+							
+							boid = boids[ i ];
+							boid.setGoal(global_object_goal.position);
+						}
+					}
+					
+					//aprinde si stinge luminile de pe model
+					if(clock%60==0||clock%60==20||clock%60==40)
+						if(global_object_goal.children.length==2){
+							global_object_goal.children[1].material.emissive = new THREE.Color( 0xffff00 );
+						}
+					
+						if(clock%60==10||clock%60==30)
+						if(global_object_goal.children.length==2){
+							global_object_goal.children[1].material.emissive = new THREE.Color( 0x000000 );
+						}
+					
+				}
+				
+				//modifica parametrii distributiei pentru fiecare particula, 
+				//daca acestia au fost modificati prin meniu
+				if(global_setParam_distCoef==true){
+					global_setParam_distCoef=false;
+					for ( var i = 0, il = birds.length; i < il; i++ ) {
+							
+						boid = boids[ i ];
+						boid.setDistCoef(global_setParam_distCoef_value);
+					}
+				}
+				
+				
+				global_object_goal_existed=global_object_goal_exists;
+                renderer.render( scene, camera );
+
+            }
+			
+			var MyCounter_Points=0;
+			var MyVectorArray_FearPoints=new Array(50);
+
+			var MyCounter_AttractionPoints=0;
+			var MyVectorArray_AttractionPoints=new Array(50);
+
+			
+        </script>
+		
+		//____________________________________________________________
+
+	<p id="paragraph 1">hello</p>
+  <script type="text/javascript" src="../build/dat.gui.js"></script>
+  <script type="text/javascript">
+  
+	//variabile pentru elemente din interiorul meniului
+	var gui_no_of_items=0;
+	  var gui_Object3D;
+	  
+	  var global_myguicontroller=false;
+	  
+	  
+	  
+	  
+	  dat.GUI.prototype.removeFolder = function(name) {
+		  var folder = this.__folders[name];
+		  if (!folder) {
+			return;
+		  }
+		  folder.close();
+		  this.__ul.removeChild(folder.domElement.parentNode);
+		  delete this.__folders[name];
+		  this.onResize();
+		}
+	  
+	//functii de meniu 
+    var obj = {
+		
+		Add_goalPoint: function () 
+		{
+			if(global_myguicontroller==true)
+				return;
+			global_myguicontroller=true;	
+			//punctele initiale din care este format drumul tintei
+			var curve = new THREE.CatmullRomCurve3( [
+				new THREE.Vector3( -70, 100, -160 ),
+				new THREE.Vector3( 120, 150, -140 ),
+				new THREE.Vector3( 130, -15, 440 ),
+				new THREE.Vector3( -60, -5, 360 ),
+				new THREE.Vector3( 15, 0, 0 ),
+			] );
+
+				curve.closed = true
+				
+
+			var geometry = new THREE.Geometry();
+			geometry.vertices = curve.getPoints( 50 );
+
+			var material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
+
+			var curveObject = new THREE.Line( geometry, material );
+			scene.add(curveObject)	;
+						
+			 ///////////////////////
+			 var Drone_3D=new THREE.Object3D();
+			 
+			//incarcarea modelului pentru drona
+			 loader.load(
+				"blender/Drone/Drone Body.json",
+				function ( geometry, materials ) {
+					var material = new THREE.MeshFaceMaterial(materials);
+					model = new THREE.Mesh( geometry, material );
+					model.scale.set(1.5,1.5,1.5);
+					Drone_3D.add( model );
+				});
+			//incarcarea modelului pentru luminile dronei, acestea sunt separate
+			//pentru a putea modifica usor materialul acestora
+			 loader.load(
+				'blender/Drone/Drone Cylinders.json',
+				function ( geometry, materials ) {
+					var material = new THREE.MeshPhongMaterial({color:0xbfbfbf});
+					var object = new THREE.Mesh( geometry, material );
+					object.scale.set(1.5,1.5,1.5);
+					object.material.emissive = new THREE.Color( 0xffff00 );
+					Drone_3D.add( object );
+				});
+
+			
+			
+			
+			
+			////////////////////////////////
+			
+	function aux(){this.v=0};
+			global_object_goal = Drone_3D;
+			global_object_goal.time=0;
+			global_object_goal.time_iteration=1/30/60;
+			global_object_goal.curve=curve;
+			scene.add(global_object_goal);
+		
+			global_object_goal_exists=true;
+			
+			var gui_afsd= gui.addFolder("Control țintă");
+			
+			var aux66=new aux();
+			aux66.v=30
+			gui_afsd.add(aux66,'v').min(0.5).max(30).step(0.1).name("Perioada (s)").onChange(function(value){
+			global_object_goal.time_iteration=1/value/60;});
+			
+			
+			
+			
+			
+			function Container(param) {
+				this.gui_crt_checkpoint_control_id = param;
+			}
+			
+			
+			
+			
+			
+			var ref=new Container(0);
+			gui_afsd.add(ref,'gui_crt_checkpoint_control_id').min(0).max(curve.points.length-1).step(1).name("Număr checkpoint").onChange(update_gui_checkpoint_xyz_attrib);
+			
+			
+	///////////////////////
+	
+	
+			var auxxxxx=new aux();
+			auxxxxx.v = function(){
+			
+			
+			
+	global_myguicontroller=false;
+	scene.remove(global_object_goal);
+	
+			scene.remove(curveObject)	;
+	global_object_goal_exists=false;
+	
+	for ( var i = 0, il = birds.length; i < il; i++ ) {
+							
+		boid = boids[ i ];
+		boid.setGoal(null);
+	}
+	
+	gui.removeFolder("Control țintă");
+			}
+			gui_afsd.add(auxxxxx,'v').name("Elimina Ținta");
+			
+	
+	
+	//////////////////////
+
+			
+			var gui_sfsd= gui_afsd.addFolder("Control checkpoint actual")
+			
+			function function_update_line() {//reconstruieste linia
+				geometry = new THREE.Geometry();
+				geometry.vertices = curve.getPoints( 50 );
+				
+				scene.remove(curveObject)	;
+				curveObject = new THREE.Line( geometry, material );
+				scene.add(curveObject)	;
+			}
+			var ax,ay,az;
+			function update_gui_checkpoint_xyz_attrib(){
+			
+			if(ax){
+			gui_sfsd.remove(ax)
+			gui_sfsd.remove(ay)
+			gui_sfsd.remove(az)}
+			ax=gui_sfsd.add(curve.points[ref.gui_crt_checkpoint_control_id], 'x').min(-500).max(500).step(1).name("Coord. x").onChange(function_update_line);
+			ay=gui_sfsd.add(curve.points[ref.gui_crt_checkpoint_control_id], 'y').min(-500).max(500).step(1).name("Coord. y").onChange(function_update_line);
+			az=gui_sfsd.add(curve.points[ref.gui_crt_checkpoint_control_id], 'z').min(-500).max(500).step(1).name("Coord. z").onChange(function_update_line);
+				
+				
+			}
+
+			update_gui_checkpoint_xyz_attrib();
+			
+			
+		},
+		
+		
+		
+		//adauga punct de respingere
+		Add_fearPoint: function () {
+			var point_number_index = MyCounter_Points;
+			
+			var my_vector = new THREE.Vector3( 0, 0, 0 );			
+			MyVectorArray_FearPoints[MyCounter_Points]=my_vector;	
+			MyCounter_Points=MyCounter_Points+1;	
+		
+			var loader = new THREE.TextureLoader();
+								
+			var texture1 =  loader.load('MyTextures/red white squares checkered.svg');
+			var material1 = new THREE.MeshPhongMaterial( { color: 0xffffff, map: texture1 } );
+				
+			var geometry = new THREE.SphereGeometry( 50, 12, 12 );
+			var mesh1 = new THREE.Mesh( geometry, material1 );
+			
+			mesh1.position.x = - 50;
+
+			scene.add( mesh1 );
+			
+			if(gui_no_of_items==0){
+				gui_Object3D=gui.addFolder('Obiecte 3D');
+			}
+		
+			gui_no_of_items=gui_no_of_items+1;
+			var gui_boxEntry = gui_Object3D.addFolder('#'+gui_no_of_items+" Punct respingere");
+			var gui_crt_item_nr=gui_no_of_items
+			
+		
+			
+			
+			  
+			var gui_boxEntry_f1 = gui_boxEntry.addFolder('Poziție');
+			
+			var myObj=[];
+			myObj.x=0;
+			
+				
+			
+			var controller = gui_boxEntry_f1.add(myObj, 'x').min(-500).max(500).step(1).name("Coord. x");
+
+			controller.onChange(function(value) {
+			
+				mesh1.position.x=value;
+				my_vector.x=value;
+			});
+
+			
+				controller = gui_boxEntry_f1.add(mesh1.position, 'y').min(-500).max(500).step(1).name("Coord. y");
+			controller.onChange(function(value) {
+			
+				my_vector.y=value;
+			});
+				controller = gui_boxEntry_f1.add(mesh1.position, 'z').min(-500).max(500).step(1).name("Coord. z");
+			controller.onChange(function(value) {
+			
+				my_vector.z=value;
+			});
+			var gui_boxEntry_f2 = gui_boxEntry.addFolder('Rotație');
+			gui_boxEntry_f2.add(mesh1.rotation, 'x').min(-3).max(3).step(0.01).name("Rotație x");
+			gui_boxEntry_f2.add(mesh1.rotation, 'y').min(-3).max(3).step(0.01).name("Rotație y");
+			gui_boxEntry_f2.add(mesh1.rotation, 'z').min(-3).max(3).step(0.01).name("Rotație z");
+				
+				
+			var haha;
+			var myInstance = {
+				  removeInstance: function () {
+					scene.remove( mesh1 );
+					
+					{
+						for(var i=point_number_index+1;i<MyCounter_Points;i++){
+							MyVectorArray_FearPoints[i-1]=MyVectorArray_FearPoints[i]};
+						MyCounter_Points=MyCounter_Points-1;
+					}
+					{
+						gui_Object3D.removeFolder("#"+gui_crt_item_nr+" Punct respingere");
+					}
+				  }
+				};
+			
+			
+			haha=gui_boxEntry.add(myInstance,"removeInstance").name("Șterge obiect");
+			
+			
+        },
+		
+		
+		//adauga punct de atractie
+		Add_attractionPoint: function () {
+			var point_number_index = MyCounter_AttractionPoints;
+		
+			var my_vector = new THREE.Vector3( 0, 0, 0 );			//
+			MyVectorArray_AttractionPoints[MyCounter_AttractionPoints]=my_vector;	
+			MyCounter_AttractionPoints=MyCounter_AttractionPoints+1;					//
+		
+			//incarca textura in memorie
+			var loader = new THREE.TextureLoader();
+								
+			var texture1 =  loader.load('MyTextures/green white squares checkered.svg');
+			var material1 = new THREE.MeshPhongMaterial( { color: 0xffffff, map: texture1 } );
+				
+			var geometry = new THREE.SphereGeometry( 50, 12, 12 );
+			var mesh1 = new THREE.Mesh( geometry, material1 );
+			
+			mesh1.position.x = - 50;
+
+			scene.add( mesh1 );
+			
+			if(gui_no_of_items==0){
+				gui_Object3D=gui.addFolder('Obiecte 3D');
+			}
+		
+			gui_no_of_items=gui_no_of_items+1;
+			var gui_boxEntry = gui_Object3D.addFolder('#'+gui_no_of_items+" Punct atracție");
+			var gui_crt_item_nr=gui_no_of_items
+			
+		
+			
+			
+			  
+			var gui_boxEntry_f1 = gui_boxEntry.addFolder('Poziție');
+			
+			var myObj=[];
+			myObj.x=0;
+			
+				
+			
+			var controller = gui_boxEntry_f1.add(myObj, 'x').min(-500).max(500).step(1).name("Coord. x");
+
+			controller.onChange(function(value) {
+
+				mesh1.position.x=value;
+				my_vector.x=value;
+			});
+
+			
+			controller = gui_boxEntry_f1.add(mesh1.position, 'y').min(-500).max(500).step(1).name("Coord. y");
+			controller.onChange(function(value) {
+				my_vector.y=value;
+			});
+			controller = gui_boxEntry_f1.add(mesh1.position, 'z').min(-500).max(500).step(1).name("Coord. z");
+			controller.onChange(function(value) {
+			  
+				my_vector.z=value;
+			});
+			var gui_boxEntry_f2 = gui_boxEntry.addFolder('Rotație');
+			gui_boxEntry_f2.add(mesh1.rotation, 'x').min(-3).max(3).step(0.01).name("Coord. x");
+			gui_boxEntry_f2.add(mesh1.rotation, 'y').min(-3).max(3).step(0.01).name("Coord. y");
+			gui_boxEntry_f2.add(mesh1.rotation, 'z').min(-3).max(3).step(0.01).name("Coord. z");
+			
+			var haha;
+			var myInstance = {
+				  removeInstance: function () {
+					scene.remove( mesh1 );
+					
+					{
+						for(var i=point_number_index+1;i<MyCounter_AttractionPoints;i++){
+							MyVectorArray_AttractionPoints[i-1]=MyVectorArray_AttractionPoints[i]};
+						MyCounter_AttractionPoints=MyCounter_AttractionPoints-1;
+					}
+					{
+						gui_Object3D.removeFolder("#"+gui_crt_item_nr+" Punct atracție");
+					}
+				  }
+				};
+			
+				
+			haha=gui_boxEntry.add(myInstance,"removeInstance").name("Șterge obiect");
+				
+
+		},
+		Pause_simulation: function(){global_simulation_pause=!global_simulation_pause;},
+		
+    };
+
+    var gui = new dat.gui.GUI();
+	//	adaugarea optiunilor initiale ale interfetei cu utilizatorul
+	gui.add(obj, 'Pause_simulation').name("Pauză/Continuă");
+	gui.add(obj, 'Add_fearPoint').name("Adaugă Punct de respingere");
+	gui.add(obj, 'Add_attractionPoint').name("Adaugă Punct de atractie");
+	gui.add(obj, 'Add_goalPoint').name("Adaugă țintă");
+	
+    var f2 = gui.addFolder('Setari simulare');
+	
+	function aux(){this.v=0};
+	var auxx=new aux();
+	
+	var auxx2=new aux();
+	auxx2.v=0.4
+	f2.add(auxx2,'v').min(0.1).max(0.9).step(0.1).name("Coef. interacțiune").onChange(function(value){
+	
+	
+				global_setParam_distCoef_value=1-value;
+				global_setParam_distCoef=true;
+	})
+
+	var auxx3=new aux();
+		auxx3.v=0
+		f2.add(auxx3,'v', { Uniformă: 0, Normală: 1 } ).name("Tip distribuție forțe interacțiune").onChange(function(value){
+		
+					for ( var i = 0, il = birds.length; i < il; i++ ) {
+
+						boid = boids[ i ];
+						boid.setDistType(value);
+					}
+		})
+		
+		
+		
+	var auxx45=new aux();
+		auxx45.v=false;
+		f2.add(auxx45,'v' ).name("Culoare păsări").onChange(function(value){
+		
+					global_simulation_colorise = value;
+		})
+		
+		
+		var auxx4=new THREE.Vector3(400,150,200);
+		
+		var fxx_menu_space=f2.addFolder("Control spațiu")
+		
+		fxx_menu_space.add(auxx4,'x').min(80).max(600).step(1).name("Lățimea spațiului").onChange(function(value){
+		
+					for ( var i = 0, il = birds.length; i < il; i++ ) {
+
+						boid = boids[ i ];
+						boid.setWorldSize(auxx4.x,auxx4.y,auxx4.z);
+					}
+		})
+		fxx_menu_space.add(auxx4,'y').min(80).max(300).step(1).name("Înălțimea spațiului").onChange(function(value){
+		
+					for ( var i = 0, il = birds.length; i < il; i++ ) {
+
+						boid = boids[ i ];
+						boid.setWorldSize(auxx4.x,auxx4.y,auxx4.z,0,auxx4.y-50,0);
+					}
+		})
+		fxx_menu_space.add(auxx4,'z').min(80).max(600).step(1).name("Lungimea spațiului").onChange(function(value){
+		
+					for ( var i = 0, il = birds.length; i < il; i++ ) {
+
+						boid = boids[ i ];
+						boid.setWorldSize(auxx4.x,auxx4.y,auxx4.z);
+					}
+		})
+
+
+	//setarea optiunilor pentru camera
+	var vect=new THREE.Vector2();
+	vect.x=0;vect.y=-0.1;
+	camera.lookAt(new THREE.Vector3(vect.x+camera.position.x,vect.y*5+camera.position.y,-Math.sqrt(1-vect.x*vect.x)+camera.position.z));
+    var f3 = f2.addFolder('Control cameră');
+	  
+				f3.add(camera.position, 'x').min(-500).max(500).step(1).name("Coord. x");
+				f3.add(camera.position, 'y').min(-130).max(1400).step(1).name("Coord. y");
+				f3.add(camera.position, 'z').min(-200).max(1000).step(1).name("Coord. z");
+	  
+				f3.add(vect, 'x').min(-1).max(1).step(0.001).name("Rotire orizontală").onChange(function(value){
+				camera.lookAt(new THREE.Vector3(vect.x+camera.position.x,vect.y*5+camera.position.y,-Math.sqrt(1-vect.x*vect.x)+camera.position.z));});
+				f3.add(vect, 'y').min(-1).max(1).step(0.001).name("Rotire verticală").onChange(function(value){
+				camera.lookAt(new THREE.Vector3(vect.x+camera.position.x,vect.y*5+camera.position.y,-Math.sqrt(1-vect.x*vect.x)+camera.position.z));});
+	  
+	
+	
+	//initializarea modelelor pentru insula, ocean, balon si far
+	
+	//clasa care se ocupa de incarcarea fisierelor JSON
+var loader = new THREE.JSONLoader();
+
+	//incarcarea modelului pentru insula
+loader.load(
+
+	'blender/valleyIsland.json',
+
+	function ( geometry, materials ) {
+
+		var material = new THREE.MeshFaceMaterial(materials);
+		var object = new THREE.Mesh( geometry, material );
+		object.position.y=-200;
+		object.scale.set(100,100,100);
+
+		scene.add( object );
+
+	}
+	);
+	  
+	//incarcarea modelului pentru ocean
+loader.load(
+
+	'blender/ocean.json',
+
+	function ( geometry, materials ) {
+
+		var material = new THREE.MeshFaceMaterial(materials);
+		var object = new THREE.Mesh( geometry, material );
+		object.scale.set(500,500,500);
+		object.position.y=-260;
+
+		scene.add( object );
+
+	}
+	);
+	  
+	  
+	  
+	  var material = new THREE.MeshBasicMaterial( { color: 0xa2ebf2,side:THREE.DoubleSide} );
+			
+                    
+                var geometry = new THREE.SphereGeometry( 5500, 24, 12 );
+                var mesh1 = new THREE.Mesh( geometry, material );
+	  mesh1.position.z=-500
+	  scene.add(mesh1);
+	  
+	  var material = new THREE.MeshBasicMaterial( { color: 0xffff00} );
+	  material.lights=false;
+			
+                    
+                var geometry = new THREE.SphereGeometry( 70, 12, 12 );
+                var mesh1 = new THREE.Mesh( geometry, material );
+	  mesh1.position.x=2700
+	  mesh1.position.y=3000
+	  mesh1.position.z=3000
+	  scene.add(mesh1);
+	  
+	  
+	  
+	  
+	//incarcarea modelului pentru balon
+	  
+	  loader.load(
+
+	'blender/blender-export/hot_air_baloon/hot_air_baloon.json',
+
+	function ( geometry, materials ) {
+
+		var material = new THREE.MeshFaceMaterial(materials);
+		var object = new THREE.Mesh( geometry, material );
+		object.scale.set(15,15,15);
+		
+
+		scene.add( object );
+		
+		
+	  object.position.x=-400
+	  object.position.y=-140
+	  object.position.z=00
+	  single_gloabal_ballon_exists=true;
+	  single_gloabal_ballon_position = object.position;
+		
+		
+		
+			    var my_vector = object.position;			//
+				MyVectorArray_FearPoints[MyCounter_Points]=my_vector;	
+          		MyCounter_Points=MyCounter_Points+1;					//
+
+	}
+	);
+	  
+	  
+	  
+	  
+	  
+	  
+	//incarcarea modelului pentru far
+	  loader.load(
+
+	'blender/blender-export/hot_air_baloon/lightHouse/lightHouse_tower.json',
+
+	function ( geometry, materials ) {
+
+		var material = new THREE.MeshFaceMaterial(materials);
+		var object = new THREE.Mesh( geometry, material );
+		object.scale.set(05,05,05);
+
+		scene.add( object );
+		
+		
+	  object.position.x=+50
+	  object.position.y=-50
+	  object.position.z=+180
+		
+			    var my_vector = object.position;			//
+				MyVectorArray_FearPoints[MyCounter_Points]=my_vector;	
+          		MyCounter_Points=MyCounter_Points+1;					//
+
+	}
+	);
+
+  </script>
+		
+    </body>
+</html>
